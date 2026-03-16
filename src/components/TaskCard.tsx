@@ -9,7 +9,7 @@ const priorityColors: Record<string, string> = {
   low: 'bg-low',
 };
 
-const transition = { duration: 0.2, ease: [0.16, 1, 0.3, 1] };
+const transition = { duration: 0.2, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] };
 
 export function TaskCard({ task }: { task: Task }) {
   const { toggleComplete, deleteTask, selectTask, selectedTaskId } = useTaskStore();

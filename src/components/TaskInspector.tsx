@@ -38,7 +38,6 @@ export function TaskInspector() {
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         className="w-80 border-l border-border bg-card h-screen sticky top-0 flex flex-col shrink-0"
       >
-        {/* Header */}
         <div className="h-12 flex items-center justify-between px-4 border-b border-border">
           <span className="text-sm font-semibold text-foreground">Task Details</span>
           <button onClick={() => setInspectorOpen(false)} className="text-muted-foreground hover:text-foreground">
@@ -46,9 +45,7 @@ export function TaskInspector() {
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Title */}
           <div>
             <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Title</label>
             <input
@@ -58,7 +55,6 @@ export function TaskInspector() {
             />
           </div>
 
-          {/* Description */}
           <div>
             <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Description</label>
             <textarea
@@ -69,7 +65,6 @@ export function TaskInspector() {
             />
           </div>
 
-          {/* Priority */}
           <div>
             <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Priority</label>
             <div className="flex gap-1 mt-1">
@@ -89,20 +84,20 @@ export function TaskInspector() {
             </div>
           </div>
 
-          {/* Due Date */}
-          <div>
-            <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-1">
-              <Calendar className="w-3 h-3" /> Due Date
-            </label>
-            <input
-              type="date"
-              value={task.dueDate.slice(0, 10)}
-              onChange={(e) => updateTask(task.id, { dueDate: new Date(e.target.value).toISOString() })}
-              className="bg-background border border-border rounded-md px-3 py-2 text-xs text-foreground font-mono mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          </div>
+          {task.dueDate && (
+            <div>
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-1">
+                <Calendar className="w-3 h-3" /> Due Date
+              </label>
+              <input
+                type="date"
+                value={task.dueDate.slice(0, 10)}
+                onChange={(e) => updateTask(task.id, { dueDate: new Date(e.target.value).toISOString() })}
+                className="bg-background border border-border rounded-md px-3 py-2 text-xs text-foreground font-mono mt-1 focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+          )}
 
-          {/* Labels */}
           <div>
             <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-1">
               <Tag className="w-3 h-3" /> Labels
@@ -117,13 +112,10 @@ export function TaskInspector() {
             </div>
           </div>
 
-          {/* Metadata */}
           <div className="text-xs text-muted-foreground font-mono space-y-1 pt-2 border-t border-border">
-            <p>ID: {task.id}</p>
             <p>Created: {format(new Date(task.createdAt), 'MMM d, yyyy')}</p>
           </div>
 
-          {/* AI Insight */}
           <div className="pt-2">
             <Button variant="ai" size="sm" className="w-full gap-1.5 text-xs" onClick={handleAiSuggest}>
               <Sparkles className="w-3.5 h-3.5" />

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { supabase } from '@/integrations/supabase/client';
 
 export type Priority = 'high' | 'medium' | 'low';
 export type TaskStatus = 'pending' | 'completed';
@@ -13,113 +13,127 @@ export interface Task {
   status: TaskStatus;
   labels: string[];
   createdAt: string;
-  aiModified?: boolean;
+  sortOrder: number;
 }
 
 interface TaskState {
   tasks: Task[];
+  loading: boolean;
   searchQuery: string;
   filterPriority: Priority | 'all';
   filterStatus: TaskStatus | 'all';
   selectedTaskId: string | null;
   inspectorOpen: boolean;
-  addTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
-  updateTask: (id: string, updates: Partial<Task>) => void;
-  deleteTask: (id: string) => void;
-  toggleComplete: (id: string) => void;
+  fetchTasks: () => Promise<void>;
+  addTask: (task: Omit<Task, 'id' | 'createdAt' | 'sortOrder'>) => Promise<void>;
+  updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
+  toggleComplete: (id: string) => Promise<void>;
   setSearchQuery: (q: string) => void;
   setFilterPriority: (p: Priority | 'all') => void;
   setFilterStatus: (s: TaskStatus | 'all') => void;
   selectTask: (id: string | null) => void;
   setInspectorOpen: (open: boolean) => void;
-  reorderTasks: (fromIndex: number, toIndex: number) => void;
 }
 
-const generateId = () => Math.random().toString(36).substring(2, 10);
+function mapRow(row: any): Task {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description || '',
+    dueDate: row.due_date || new Date().toISOString(),
+    priority: row.priority as Priority,
+    status: row.status as TaskStatus,
+    labels: row.labels || [],
+    createdAt: row.created_at,
+    sortOrder: row.sort_order || 0,
+  };
+}
 
-const sampleTasks: Task[] = [
-  {
-    id: generateId(), title: 'Refactor authentication module',
-    description: 'Migrate from session-based auth to JWT tokens. Update middleware and test coverage.',
-    dueDate: new Date(Date.now() + 86400000).toISOString(), priority: 'high', status: 'pending',
-    labels: ['backend', 'security'], createdAt: new Date().toISOString(),
+export const useTaskStore = create<TaskState>()((set, get) => ({
+  tasks: [],
+  loading: true,
+  searchQuery: '',
+  filterPriority: 'all',
+  filterStatus: 'all',
+  selectedTaskId: null,
+  inspectorOpen: false,
+
+  fetchTasks: async () => {
+    set({ loading: true });
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) {
+      set({ tasks: data.map(mapRow), loading: false });
+    } else {
+      set({ loading: false });
+    }
   },
-  {
-    id: generateId(), title: 'Design system color audit',
-    description: 'Verify all components use semantic tokens. Fix any hardcoded color values.',
-    dueDate: new Date(Date.now() + 172800000).toISOString(), priority: 'medium', status: 'pending',
-    labels: ['design', 'frontend'], createdAt: new Date().toISOString(),
+
+  addTask: async (task) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase.from('tasks').insert({
+      user_id: user.id,
+      title: task.title,
+      description: task.description,
+      due_date: task.dueDate,
+      priority: task.priority,
+      status: task.status,
+      labels: task.labels,
+    }).select().single();
+    if (!error && data) {
+      set((s) => ({ tasks: [mapRow(data), ...s.tasks] }));
+    }
   },
-  {
-    id: generateId(), title: 'Write API documentation',
-    description: 'Document all REST endpoints with request/response examples using OpenAPI spec.',
-    dueDate: new Date(Date.now() + 259200000).toISOString(), priority: 'low', status: 'pending',
-    labels: ['docs'], createdAt: new Date().toISOString(),
+
+  updateTask: async (id, updates) => {
+    const dbUpdates: any = {};
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
+    if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.labels !== undefined) dbUpdates.labels = updates.labels;
+
+    const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', id);
+    if (!error) {
+      set((s) => ({
+        tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+      }));
+    }
   },
-  {
-    id: generateId(), title: 'Fix responsive layout on mobile',
-    description: 'The sidebar overlaps content on screens < 768px. Add proper breakpoints.',
-    dueDate: new Date(Date.now() + 43200000).toISOString(), priority: 'high', status: 'pending',
-    labels: ['frontend', 'bug'], createdAt: new Date().toISOString(),
+
+  deleteTask: async (id) => {
+    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    if (!error) {
+      set((s) => ({
+        tasks: s.tasks.filter((t) => t.id !== id),
+        selectedTaskId: s.selectedTaskId === id ? null : s.selectedTaskId,
+      }));
+    }
   },
-  {
-    id: generateId(), title: 'Set up CI/CD pipeline',
-    description: 'Configure GitHub Actions for automated testing and deployment to staging.',
-    dueDate: new Date(Date.now() + 432000000).toISOString(), priority: 'medium', status: 'completed',
-    labels: ['devops'], createdAt: new Date(Date.now() - 86400000).toISOString(),
+
+  toggleComplete: async (id) => {
+    const task = get().tasks.find((t) => t.id === id);
+    if (!task) return;
+    const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+    const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
+    if (!error) {
+      set((s) => ({
+        tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: newStatus as TaskStatus } : t)),
+      }));
+    }
   },
-];
 
-export const useTaskStore = create<TaskState>()(
-  persist(
-    (set) => ({
-      tasks: sampleTasks,
-      searchQuery: '',
-      filterPriority: 'all',
-      filterStatus: 'all',
-      selectedTaskId: null,
-      inspectorOpen: false,
-
-      addTask: (task) =>
-        set((state) => ({
-          tasks: [{ ...task, id: generateId(), createdAt: new Date().toISOString() }, ...state.tasks],
-        })),
-
-      updateTask: (id, updates) =>
-        set((state) => ({
-          tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-        })),
-
-      deleteTask: (id) =>
-        set((state) => ({
-          tasks: state.tasks.filter((t) => t.id !== id),
-          selectedTaskId: state.selectedTaskId === id ? null : state.selectedTaskId,
-        })),
-
-      toggleComplete: (id) =>
-        set((state) => ({
-          tasks: state.tasks.map((t) =>
-            t.id === id ? { ...t, status: t.status === 'completed' ? 'pending' : 'completed' } : t
-          ),
-        })),
-
-      setSearchQuery: (searchQuery) => set({ searchQuery }),
-      setFilterPriority: (filterPriority) => set({ filterPriority }),
-      setFilterStatus: (filterStatus) => set({ filterStatus }),
-      selectTask: (selectedTaskId) => set({ selectedTaskId, inspectorOpen: selectedTaskId !== null }),
-      setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
-
-      reorderTasks: (fromIndex, toIndex) =>
-        set((state) => {
-          const tasks = [...state.tasks];
-          const [moved] = tasks.splice(fromIndex, 1);
-          tasks.splice(toIndex, 0, moved);
-          return { tasks };
-        }),
-    }),
-    { name: 'task-store' }
-  )
-);
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
+  setFilterPriority: (filterPriority) => set({ filterPriority }),
+  setFilterStatus: (filterStatus) => set({ filterStatus }),
+  selectTask: (selectedTaskId) => set({ selectedTaskId, inspectorOpen: selectedTaskId !== null }),
+  setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
+}));
 
 // Selectors
 export const useFilteredTasks = () => {
@@ -139,7 +153,7 @@ export const useTaskStats = () => {
   const completed = tasks.filter((t) => t.status === 'completed').length;
   const pending = total - completed;
   const high = tasks.filter((t) => t.priority === 'high' && t.status === 'pending').length;
-  const overdue = tasks.filter((t) => t.status === 'pending' && new Date(t.dueDate) < new Date()).length;
+  const overdue = tasks.filter((t) => t.status === 'pending' && t.dueDate && new Date(t.dueDate) < new Date()).length;
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
   return { total, completed, pending, high, overdue, percentage };
 };

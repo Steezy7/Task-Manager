@@ -9,10 +9,12 @@ export function InlineTaskForm({ onClose }: { onClose: () => void }) {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 86400000).toISOString().slice(0, 10));
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    if (!title.trim()) return;
-    addTask({
+  const handleSubmit = async () => {
+    if (!title.trim() || submitting) return;
+    setSubmitting(true);
+    await addTask({
       title: title.trim(),
       description: description.trim(),
       dueDate: new Date(dueDate).toISOString(),
@@ -20,6 +22,7 @@ export function InlineTaskForm({ onClose }: { onClose: () => void }) {
       status: 'pending',
       labels: [],
     });
+    setSubmitting(false);
     onClose();
   };
 
@@ -78,7 +81,9 @@ export function InlineTaskForm({ onClose }: { onClose: () => void }) {
 
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onClose} className="text-xs">Cancel</Button>
-          <Button size="sm" onClick={handleSubmit} className="text-xs">Create Task</Button>
+          <Button size="sm" onClick={handleSubmit} disabled={submitting} className="text-xs">
+            {submitting ? 'Creating...' : 'Create Task'}
+          </Button>
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { AppSidebar } from '@/components/AppSidebar';
 import { Topbar } from '@/components/Topbar';
 import { useTaskStore } from '@/store/taskStore';
@@ -8,7 +9,10 @@ import { CheckCircle2 } from 'lucide-react';
 
 export default function CompletedTasks() {
   const tasks = useTaskStore((s) => s.tasks);
+  const fetchTasks = useTaskStore((s) => s.fetchTasks);
   const completed = tasks.filter((t) => t.status === 'completed');
+
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   return (
     <div className="flex min-h-screen w-full bg-background">

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useTaskStore } from '@/store/taskStore';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppSidebar } from '@/components/AppSidebar';
@@ -8,13 +8,15 @@ import { Topbar } from '@/components/Topbar';
 
 export default function CalendarView() {
   const tasks = useTaskStore((s) => s.tasks);
+  const fetchTasks = useTaskStore((s) => s.fetchTasks);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   const days = useMemo(() => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
     const allDays = eachDayOfInterval({ start, end });
-    // Pad start to Monday
     const startDay = start.getDay();
     const padStart = startDay === 0 ? 6 : startDay - 1;
     const padDays: (Date | null)[] = Array(padStart).fill(null);
@@ -39,7 +41,6 @@ export default function CalendarView() {
       <div className="flex-1 flex flex-col min-h-screen">
         <Topbar />
         <div className="flex-1 p-5 overflow-auto">
-          {/* Month nav */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-foreground">
               {format(currentMonth, 'MMMM yyyy')}
@@ -57,7 +58,6 @@ export default function CalendarView() {
             </div>
           </div>
 
-          {/* Weekday headers */}
           <div className="grid grid-cols-7 gap-px mb-px">
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
               <div key={d} className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium text-center py-2">
@@ -66,23 +66,15 @@ export default function CalendarView() {
             ))}
           </div>
 
-          {/* Calendar grid */}
           <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
             {days.map((day, i) => {
-              if (!day) {
-                return <div key={`pad-${i}`} className="bg-background min-h-[100px]" />;
-              }
+              if (!day) return <div key={`pad-${i}`} className="bg-background min-h-[100px]" />;
               const key = format(day, 'yyyy-MM-dd');
               const dayTasks = tasksByDate[key] || [];
               const today = isToday(day);
 
               return (
-                <div
-                  key={key}
-                  className={`bg-background min-h-[100px] p-1.5 ${
-                    !isSameMonth(day, currentMonth) ? 'opacity-30' : ''
-                  }`}
-                >
+                <div key={key} className="bg-background min-h-[100px] p-1.5">
                   <div className={`text-xs font-mono tabular-nums mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
                     today ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
                   }`}>

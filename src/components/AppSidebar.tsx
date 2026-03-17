@@ -1,15 +1,19 @@
-import { LayoutDashboard, Calendar, CheckCircle2, Settings, User } from 'lucide-react';
+import { LayoutDashboard, Calendar, CheckCircle2, Settings, User, LogOut } from 'lucide-react';
 import { useTaskStats } from '@/store/taskStore';
+import { useAuth } from '@/hooks/useAuth';
+import { NavLink, useLocation } from 'react-router-dom';
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', active: true },
-  { icon: Calendar, label: 'Calendar' },
-  { icon: CheckCircle2, label: 'Completed' },
-  { icon: Settings, label: 'Settings' },
+  { icon: LayoutDashboard, label: 'Dashboard', to: '/' },
+  { icon: Calendar, label: 'Calendar', to: '/calendar' },
+  { icon: CheckCircle2, label: 'Completed', to: '/completed' },
+  { icon: Settings, label: 'Settings', to: '/settings' },
 ];
 
 export function AppSidebar() {
   const stats = useTaskStats();
+  const { user, signOut } = useAuth();
+  const location = useLocation();
 
   return (
     <aside className="w-64 shrink-0 border-r border-border bg-sidebar flex flex-col h-screen sticky top-0">
@@ -25,24 +29,28 @@ export function AppSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 py-3 px-3 space-y-0.5">
-        {navItems.map((item) => (
-          <button
-            key={item.label}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors ${
-              item.active
-                ? 'bg-sidebar-accent text-foreground'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-            }`}
-          >
-            <item.icon className="w-4 h-4" />
-            <span>{item.label}</span>
-            {item.label === 'Completed' && (
-              <span className="ml-auto font-mono text-xs text-muted-foreground tabular-nums">
-                {stats.completed}
-              </span>
-            )}
-          </button>
-        ))}
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.to;
+          return (
+            <NavLink
+              key={item.label}
+              to={item.to}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors ${
+                isActive
+                  ? 'bg-sidebar-accent text-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+              }`}
+            >
+              <item.icon className="w-4 h-4" />
+              <span>{item.label}</span>
+              {item.label === 'Completed' && (
+                <span className="ml-auto font-mono text-xs text-muted-foreground tabular-nums">
+                  {stats.completed}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Stats */}
@@ -76,10 +84,12 @@ export function AppSidebar() {
         <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center">
           <User className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
-        <div className="text-xs">
-          <p className="text-foreground font-medium">User</p>
-          <p className="text-muted-foreground">user@taskflow.dev</p>
+        <div className="text-xs flex-1 min-w-0">
+          <p className="text-foreground font-medium truncate">{user?.email || 'User'}</p>
         </div>
+        <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors" title="Sign out">
+          <LogOut className="w-3.5 h-3.5" />
+        </button>
       </div>
     </aside>
   );
